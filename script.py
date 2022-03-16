@@ -2,10 +2,11 @@
 
 import pprint
 import graphviz
-from sqlalchemy import create_engine
-from copy import deepcopy
 
-e = create_engine('postgresql://postgres:postgres@127.0.0.1:5435/knd02_damp')
+from copy import deepcopy
+from sqlalchemy import create_engine
+
+from include.comparison import object_type_to_function_comparison
 
 def sqlresult(e, sql):
     """
@@ -55,12 +56,13 @@ class db_object():
         self.object_type = object_type
         self.owner = owner
         self.source = None
-        
         self.children = []
         self.parents = []
         self.columns = {}
         self.fkeys = []
-        
+
+        self._get_source()
+
     def __repr__(self):
         # return '{0}.{1}({2})'.format(self.schema_name, self.name, self.oid)
         column_information = []
@@ -78,18 +80,14 @@ class db_object():
 
 '''.format(self.schema_name, self.name, self.children, self.parents, self.object_type, '\n'.join(column_information))
         
-    def get_source(self):
-        sql = 'select {0}({1}, False)' # ToDo Переделать на f
-        if self.object_type == 'view':
-            sql_source_function = 'pg_get_viewdef'
-        else:
-            sql_source_function = None
+    def _get_source(self):
+        sql = 'select {0}({1})' # ToDo Переделать на f
+        sql_source_function = object_type_to_function_comparison(self.object_type)
         if sql_source_function:
-            sql.format(sql_source_function, self.oid)
-            result = sqlresult(e, sql) # ToDo Проверить результат, сохранить в переменную self.source (https://www.postgresql.org/docs/current/functions-info.html)
+            self.source = sqlresult(e, sql.format(sql_source_function, self.oid)).fetchone()[0]
         
     def get_parents(self, oid_object):
-        return parents
+        return self.parents
 
     def add_column(self, num, name, column_type, nullable, col_description):
         try:
@@ -98,6 +96,9 @@ class db_object():
             pass
             
 if __name__ == "__main__":
+
+    e = create_engine('postgresql://postgres:postgres@127.0.0.1:5435/knd02_damp')
+
     with open('./sql/get_table_all.sql', 'r', encoding='utf-8') as sql:
         all_tables = sqlresult(e, sql.read())
     objects = {}
@@ -120,5 +121,7 @@ if __name__ == "__main__":
         objects[oid].add_column(num, name, column_type, nullable, col_description)
         
     pprint.pprint(objects)
-    get_graphvis(objects, 'oids.png','oids')
-    get_graphvis(objects, 'names.png','names')
+    for oid, object in objects.items():
+        print(object.source)
+ #   get_graphvis(objects, 'oids.png','oids')
+ #   get_graphvis(objects, 'names.png','names')
