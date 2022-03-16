@@ -54,6 +54,7 @@ class db_object():
         self.name = name
         self.object_type = object_type
         self.owner = owner
+        self.source = None
         
         self.children = []
         self.parents = []
@@ -77,9 +78,16 @@ class db_object():
 
 '''.format(self.schema_name, self.name, self.children, self.parents, self.object_type, '\n'.join(column_information))
         
-    def get_source():
-        pass
-
+    def get_source(self):
+        sql = 'select {0}({1}, False)' # ToDo Переделать на f
+        if self.object_type == 'view':
+            sql_source_function = 'pg_get_viewdef'
+        else:
+            sql_source_function = None
+        if sql_source_function:
+            sql.format(sql_source_function, self.oid)
+            result = sqlresult(e, sql) # ToDo Проверить результат, сохранить в переменную self.source (https://www.postgresql.org/docs/current/functions-info.html)
+        
     def get_parents(self, oid_object):
         return parents
 
