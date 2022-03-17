@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import pprint
 import graphviz
+import pprint
+import string
 
 from copy import deepcopy
 from sqlalchemy import create_engine
@@ -120,8 +121,19 @@ if __name__ == "__main__":
         oid, num, name, column_type,_ ,nullable,_,_,_,_,_,col_description = column  
         objects[oid].add_column(num, name, column_type, nullable, col_description)
         
-    pprint.pprint(objects)
+    names = {'.'.join([object.schema_name, object.name]).lower().translate(str.maketrans('', '', string.punctuation)):oid for oid, object in objects.items()}
+    pprint.pprint(names)
+    
     for oid, object in objects.items():
-        print(object.source)
+        #print(object.source)
+        if object.object_type in ('view'):
+            code = self.source.lower().translate(str.maketrans('', '', string.punctuation))
+            parents = set(names.keys()) & set(code.split())
+            if parents:
+                for parent in parents:
+                    object.parents.append(names[parent])
+    
+    pprint.pprint(objects)
+    
  #   get_graphvis(objects, 'oids.png','oids')
  #   get_graphvis(objects, 'names.png','names')
