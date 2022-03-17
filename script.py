@@ -39,9 +39,11 @@ def get_graphvis(objects, filename, graph_type):
     elif graph_type == 'names':
         parent = lambda object: '.'.join([object.schema_name, object.name])
         child = lambda object, node: '.'.join([objects[node].schema_name, objects[node].name])
-        
+
+    colore = {'table': '#40e0d0', 'view': 'yellow', 'sequence': 'red'}
     g = graphviz.Digraph('G', filename='process.gv', engine='sfdp')
     for object in objects.values():
+        g.node(parent(object), style='filled', fillcolor= colore.get(object.object_type))
         for node in object.children:
             g.edge(parent(object), child(object, node))
     g.save() 
@@ -97,9 +99,10 @@ class db_object():
             pass
             
 if __name__ == "__main__":
-
+    # Создал коннект
     e = create_engine('postgresql://postgres:postgres@127.0.0.1:5435/knd02_damp')
 
+    # Базовые запросы
     with open('./sql/get_table_all.sql', 'r', encoding='utf-8') as sql:
         all_tables = sqlresult(e, sql.read())
     objects = {}
@@ -120,20 +123,23 @@ if __name__ == "__main__":
     for column in all_columns.fetchall():
         oid, num, name, column_type,_ ,nullable,_,_,_,_,_,col_description = column  
         objects[oid].add_column(num, name, column_type, nullable, col_description)
-        
-    names = {'.'.join([object.schema_name, object.name]).lower().translate(str.maketrans('', '', string.punctuation)):oid for oid, object in objects.items()}
-    pprint.pprint(names)
-    
+
+    # Подготовка имен объектов для поиска через множества (public.all_users -> publicallusers). Вынужденная история для сравнения с sql
+    names = {}
     for oid, object in objects.items():
-        #print(object.source)
-        if object.object_type in ('view'):
-            code = self.source.lower().translate(str.maketrans('', '', string.punctuation))
+        names['.'.join([object.schema_name, object.name]).lower().translate(str.maketrans('', '', string.punctuation))] = oid
+        names[object.name.lower().translate(str.maketrans('', '', string.punctuation))] = oid # For default (public) schema. ToDo необходимо прикрутить механизм поиска схемы по умолчанию либо получать запрос всегда со схемами.
+    # Сравнение имен и sql через set
+    for oid, object in objects.items():
+        if object.object_type in ('view', 'materialized view'):
+            code = object.source.lower().translate(str.maketrans('', '', string.punctuation))
             parents = set(names.keys()) & set(code.split())
             if parents:
                 for parent in parents:
                     object.parents.append(names[parent])
+                    objects[names[parent]].children.append(object.oid)
     
     pprint.pprint(objects)
     
- #   get_graphvis(objects, 'oids.png','oids')
- #   get_graphvis(objects, 'names.png','names')
+    #get_graphvis(objects, 'oids.png','oids')
+    #get_graphvis(objects, 'names.png','names')
