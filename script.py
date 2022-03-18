@@ -109,7 +109,14 @@ if __name__ == "__main__":
     for obj in all_tables.fetchall():
         oid, schema_name, schema_oid, name, object_type, owner = obj
         objects[oid] = db_object(oid, schema_name, schema_oid, name, object_type, owner)
-    
+
+    with open('./sql/get_func_trigger_all.sql', 'r', encoding='utf-8') as sql:
+        all_objects = sqlresult(e, sql.read())
+    objects = {}
+    for obj in all_objects.fetchall():
+        oid, schema_name, schema_oid, name, object_type, owner, _, _ = obj
+        objects[oid] = db_object(oid, schema_name, schema_oid, name, object_type, owner)        
+        
     with open('./sql/get_fk_all.sql', 'r', encoding='utf-8') as sql:
         all_fk = sqlresult(e, sql.read())
     for fk in all_fk.fetchall():
