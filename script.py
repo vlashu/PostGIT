@@ -40,7 +40,7 @@ def get_graphvis(objects, filename, graph_type):
         parent = lambda object: '.'.join([object.schema_name, object.name])
         child = lambda object, node: '.'.join([objects[node].schema_name, objects[node].name])
 
-    colore = {'table': '#40e0d0', 'view': 'yellow', 'sequence': 'red'}
+    colore = {'table': '#40e0d0', 'view': 'yellow', 'func': 'red', 'materialized view' = 'green'}
     g = graphviz.Digraph('G', filename='process.gv', engine='sfdp')
     for object in objects.values():
         g.node(parent(object), style='filled', fillcolor= colore.get(object.object_type))
@@ -112,7 +112,6 @@ if __name__ == "__main__":
 
     with open('./sql/get_func_trigger_all.sql', 'r', encoding='utf-8') as sql:
         all_objects = sqlresult(e, sql.read())
-    objects = {}
     for obj in all_objects.fetchall():
         oid, schema_name, schema_oid, name, object_type, owner, _, _ = obj
         objects[oid] = db_object(oid, schema_name, schema_oid, name, object_type, owner)        
@@ -138,7 +137,7 @@ if __name__ == "__main__":
         names[object.name.lower().translate(str.maketrans('', '', string.punctuation))] = oid # For default (public) schema. ToDo необходимо прикрутить механизм поиска схемы по умолчанию либо получать запрос всегда со схемами.
     # Сравнение имен и sql через set
     for oid, object in objects.items():
-        if object.object_type in ('view', 'materialized view'):
+        if object.object_type in ('view', 'materialized view', 'func'):
             code = object.source.lower().translate(str.maketrans('', '', string.punctuation))
             parents = set(names.keys()) & set(code.split())
             if parents:
