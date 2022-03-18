@@ -45,7 +45,8 @@ def get_graphvis(objects, filename, graph_type):
     for object in objects.values():
         g.node(parent(object), style='filled', fillcolor= colore.get(object.object_type))
         for node in object.children:
-            g.edge(parent(object), child(object, node))
+            edge_color = "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)])
+            g.edge(parent(object), child(object, node), color=edge_color)
     g.save() 
     graphviz.render('dot', 'png', 'process.gv', outfile = filename).replace('\\', '/')    
     
