@@ -4,8 +4,8 @@ SELECT
   n.oid,
   p.proname as "Name",
  CASE
-  WHEN p.proisagg THEN 'agg'
-  WHEN p.proiswindow THEN 'window'
+  --WHEN p.proisagg THEN 'agg'
+  --WHEN p.proiswindow THEN 'window'
   WHEN p.prorettype = 'pg_catalog.trigger'::pg_catalog.regtype THEN 'trigger'
   ELSE 'func'
  END as "Type",
