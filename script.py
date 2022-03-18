@@ -40,7 +40,7 @@ def get_graphvis(objects, filename, graph_type):
         parent = lambda object: '.'.join([object.schema_name, object.name])
         child = lambda object, node: '.'.join([objects[node].schema_name, objects[node].name])
 
-    colore = {'table': '#40e0d0', 'view': 'yellow', 'func': 'red', 'materialized view' = 'green'}
+    colore = {'table': '#40e0d0', 'view': 'yellow', 'func': 'red', 'materialized view': 'green'}
     g = graphviz.Digraph('G', filename='process.gv', engine='sfdp')
     for object in objects.values():
         g.node(parent(object), style='filled', fillcolor= colore.get(object.object_type))
