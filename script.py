@@ -3,6 +3,7 @@
 import graphviz
 import pprint
 import string
+import random
 
 from copy import deepcopy
 from sqlalchemy import create_engine
@@ -36,19 +37,39 @@ def get_graphvis(objects, filename, graph_type):
     if graph_type == 'oids':
         parent = lambda object: str(object.oid)
         child = lambda object, node: str(node)
+        g = graphviz.Digraph('G', filename='process.gv', engine='sfdp')
+        gnode = lambda object: g.node(parent(object), style='filled', fillcolor=colore.get(object.object_type))
+
     elif graph_type == 'names':
         parent = lambda object: '.'.join([object.schema_name, object.name])
         child = lambda object, node: '.'.join([objects[node].schema_name, objects[node].name])
+        g = graphviz.Digraph('structs', filename='process.gv', node_attr={'shape': 'plaintext'})
+        gnode = lambda object: g.node(parent(object), '''<
+                <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0">
+                  <TR>
+                    <TD>{0}</TD>
+                  </TR>
+                  <TR>
+                    <TD>{1}</TD>
+                  </TR>
+                  <TR>
+                    <TD>{2}</TD>
+                  </TR>
+                  <TR>
+                    <TD>{3}</TD>
+                  </TR>
+                </TABLE>>'''.format(object.oid, object.schema_name, object.name, object.object_type, ), style='filled',
+                                      fillcolor=colore.get(object.object_type))
 
-    colore = {'table': '#40e0d0', 'view': 'yellow', 'func': 'red', 'materialized view': 'green'}
-    g = graphviz.Digraph('G', filename='process.gv', engine='sfdp')
+    colore = {'table': '#40e0d0', 'view': '#F0E68C', 'func': '#FFA07A', 'materialized view': '#90EE90', 'trigger_func': '#87CEEB'}
+
     for object in objects.values():
-        g.node(parent(object), style='filled', fillcolor= colore.get(object.object_type))
+        gnode(object)
         for node in object.children:
             edge_color = "#"+''.join([random.choice('0123456789ABCDEF') for j in range(6)])
             g.edge(parent(object), child(object, node), color=edge_color)
     g.save() 
-    graphviz.render('dot', 'png', 'process.gv', outfile = filename).replace('\\', '/')    
+    graphviz.render('dot', 'png', 'process.gv', outfile=filename).replace('\\', '/')
     
 class db_object():
     """Общий класс для хранения объектов БД"""
@@ -138,15 +159,17 @@ if __name__ == "__main__":
         names[object.name.lower().translate(str.maketrans('', '', string.punctuation))] = oid # For default (public) schema. ToDo необходимо прикрутить механизм поиска схемы по умолчанию либо получать запрос всегда со схемами.
     # Сравнение имен и sql через set
     for oid, object in objects.items():
-        if object.object_type in ('view', 'materialized view', 'func'):
-            code = object.source.lower().translate(str.maketrans('', '', string.punctuation))
-            parents = set(names.keys()) & set(code.split())
-            if parents:
-                for parent in parents:
-                    object.parents.append(names[parent])
-                    objects[names[parent]].children.append(object.oid)
-    
+        if object.object_type in ('view', 'materialized view', 'func', 'trigger_func'):
+            try:
+                code = object.source.lower().translate(str.maketrans('', '', string.punctuation))
+                parents = set(names.keys()) & set(code.split())
+                if parents:
+                    for parent in parents:
+                        object.parents.append(names[parent])
+                        objects[names[parent]].children.append(object.oid)
+            except:
+                print(object.oid, object.name, object.source)
     pprint.pprint(objects)
     
-    #get_graphvis(objects, 'oids.png','oids')
-    #get_graphvis(objects, 'names.png','names')
+    get_graphvis(objects, 'oids.png','oids')
+    get_graphvis(objects, 'names.png','names')

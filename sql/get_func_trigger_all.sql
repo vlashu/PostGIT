@@ -6,7 +6,7 @@ SELECT
  CASE
   --WHEN p.proisagg THEN 'agg'
   --WHEN p.proiswindow THEN 'window'
-  WHEN p.prorettype = 'pg_catalog.trigger'::pg_catalog.regtype THEN 'trigger'
+  WHEN p.prorettype = 'pg_catalog.trigger'::pg_catalog.regtype THEN 'trigger_func'
   ELSE 'func'
  END as "Type",
   p.proowner,

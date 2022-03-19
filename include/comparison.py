@@ -11,6 +11,7 @@ def object_type_to_function_comparison(object_type) -> str:
         'constraint': 'pg_get_constraintdef', # pg_get_constraintdef ( constraint oid [, pretty boolean ] ) → text
         'func': 'pg_get_functiondef',         # pg_get_functiondef ( func oid ) → text
         'rule': 'pg_get_ruledef',             # pg_get_ruledef ( rule oid [, pretty boolean ] ) → text
+        'trigger_func': 'pg_get_functiondef',  # pg_get_triggerdef ( trigger oid [, pretty boolean ] ) → text
         'trigger': 'pg_get_triggerdef',       # pg_get_triggerdef ( trigger oid [, pretty boolean ] ) → text
     }
     return object_type_to_function.get(object_type)
