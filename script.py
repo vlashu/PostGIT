@@ -10,6 +10,8 @@ from sqlalchemy import create_engine
 
 from include.comparison import object_type_to_function_comparison
 
+#ToDo разобраться с последовательностями (sequence), сначала последоватекльность, потом таблица + вынимать последний номер по порядку если есть
+
 def sqlresult(e, sql):
     """
     Метод для выполнения запроса с созданием подключения
@@ -61,7 +63,13 @@ def get_graphvis(objects, filename, graph_type):
                 </TABLE>>'''.format(object.oid, object.schema_name, object.name, object.object_type, ), style='filled',
                                       fillcolor=colore.get(object.object_type))
 
-    colore = {'table': '#40e0d0', 'view': '#F0E68C', 'func': '#FFA07A', 'materialized view': '#90EE90', 'trigger_func': '#87CEEB'}
+    colore = {'table': '#40e0d0',
+              'view': '#F0E68C',
+              'func': '#FFA07A',
+              'materialized view': '#90EE90',
+              'trigger_func': '#87CEEB',
+              'trigger': '#FFDAB9'б
+              }
 
     for object in objects.values():
         gnode(object)
@@ -137,7 +145,13 @@ if __name__ == "__main__":
     for obj in all_objects.fetchall():
         oid, schema_name, schema_oid, name, object_type, owner, _, _ = obj
         objects[oid] = db_object(oid, schema_name, schema_oid, name, object_type, owner)        
-        
+
+    with open('./sql/get_all_trigger.sql', 'r', encoding='utf-8') as sql:
+        all_objects = sqlresult(e, sql.read())
+    for obj in all_objects.fetchall():
+        oid, schema_name, schema_oid, name, object_type, owner = obj
+        objects[oid] = db_object(oid, schema_name, schema_oid, name, object_type, owner)
+
     with open('./sql/get_fk_all.sql', 'r', encoding='utf-8') as sql:
         all_fk = sqlresult(e, sql.read())
     for fk in all_fk.fetchall():
@@ -159,7 +173,7 @@ if __name__ == "__main__":
         names[object.name.lower().translate(str.maketrans('', '', string.punctuation))] = oid # For default (public) schema. ToDo необходимо прикрутить механизм поиска схемы по умолчанию либо получать запрос всегда со схемами.
     # Сравнение имен и sql через set
     for oid, object in objects.items():
-        if object.object_type in ('view', 'materialized view', 'func', 'trigger_func'):
+        if object.object_type in ('view', 'materialized view', 'func', 'trigger_func', 'trigger'):
             try:
                 code = object.source.lower().translate(str.maketrans('', '', string.punctuation))
                 parents = set(names.keys()) & set(code.split())
