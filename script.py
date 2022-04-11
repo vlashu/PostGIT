@@ -68,7 +68,7 @@ def get_graphvis(objects, filename, graph_type):
               'func': '#FFA07A',
               'materialized view': '#90EE90',
               'trigger_func': '#87CEEB',
-              'trigger': '#FFDAB9'б
+              'trigger': '#FFDAB9'
               }
 
     for object in objects.values():
@@ -93,7 +93,7 @@ class db_object():
         self.parents = []
         self.columns = {}
         self.fkeys = []
-
+        self.rank = None
         self._get_source()
 
     def __repr__(self):
@@ -108,10 +108,17 @@ class db_object():
         return '''{4} {0}.{1}  
             children:{2}
             parents:{3}
+            rank:{6}
             columns: 
 {5}
 
-'''.format(self.schema_name, self.name, self.children, self.parents, self.object_type, '\n'.join(column_information))
+'''.format(self.schema_name,
+           self.name,
+           self.children,
+           self.parents,
+           self.object_type,
+           '\n'.join(column_information),
+           self.rank)
         
     def _get_source(self):
         sql = 'select {0}({1})' # ToDo Переделать на f
@@ -176,14 +183,42 @@ if __name__ == "__main__":
         if object.object_type in ('view', 'materialized view', 'func', 'trigger_func', 'trigger'):
             try:
                 code = object.source.lower().translate(str.maketrans('', '', string.punctuation))
-                parents = set(names.keys()) & set(code.split())
+                parents = set(names.keys()) & set(code.split()) # Пересечение множеств
                 if parents:
                     for parent in parents:
                         object.parents.append(names[parent])
                         objects[names[parent]].children.append(object.oid)
             except:
                 print(object.oid, object.name, object.source)
-    pprint.pprint(objects)
-    
-    get_graphvis(objects, 'oids.png','oids')
-    get_graphvis(objects, 'names.png','names')
+
+    # Ранжирование по очереди создания
+
+    def ranker(all_objects_list, objects, rank, list_ranked):
+        print(len(all_objects_list))
+        removed_list = []
+        for oid in all_objects_list:
+            list_ranked.append(oid)
+            if not objects[oid].parents or set(objects[oid].parents).issubset(set(list_ranked)):
+                objects[oid].rank = rank
+                rank += 1
+                removed_list.append(oid)
+        return removed_list, rank
+
+    rank = 1
+    list_ranked = []
+    all_objects_list = [oid for oid in objects.keys()]
+
+    while all_objects_list:
+        removed_list, rank = ranker(all_objects_list, objects, rank, list_ranked)
+        all_objects_list = list(set(all_objects_list) - set(removed_list))
+
+    # Блок принтов ####################################################
+
+    pprint.pprint(objects) # Все объекты
+
+    rank_obj = {value.rank: value.schema_name+'.'+value.name for key, value in objects.items()} # Порядок накатки
+    for order in sorted(rank_obj.keys()):
+        print(order, rank_obj[order])
+
+    get_graphvis(objects, 'oids.png', 'oids') 
+    get_graphvis(objects, 'names.png', 'names')
