@@ -3,6 +3,7 @@
 import graphviz
 import pprint
 import string
+import subprocess
 import random
 
 from copy import deepcopy
@@ -10,7 +11,9 @@ from sqlalchemy import create_engine
 
 from include.comparison import object_type_to_function_comparison
 
-#ToDo разобраться с последовательностями (sequence), сначала последоватекльность, потом таблица + вынимать последний номер по порядку если есть
+# ToDo разобраться с последовательностями (sequence), сначала последоватекльность, потом таблица + вынимать последний номер по порядку если есть
+# ToDo реализовать сохранение в файлы.
+# ToDo реализовать прогресс программы.
 
 def sqlresult(e, sql):
     """
@@ -125,7 +128,9 @@ class db_object():
         sql_source_function = object_type_to_function_comparison(self.object_type)
         if sql_source_function:
             self.source = sqlresult(e, sql.format(sql_source_function, self.oid)).fetchone()[0]
-        
+        elif self.object_type == 'table':
+            self.source = subprocess.check_output('PGPASSWORD="postgres" pg_dump -t ksvs.militarycity --schema-only --host=127.0.0.1 --port=5435 --username=postgres --dbname=knd02_damp', shell=True)
+
     def get_parents(self, oid_object):
         return self.parents
 
@@ -220,5 +225,6 @@ if __name__ == "__main__":
     for order in sorted(rank_obj.keys()):
         print(order, rank_obj[order])
 
-    get_graphvis(objects, 'oids.png', 'oids') 
+    get_graphvis(objects, 'oids.png', 'oids')
     get_graphvis(objects, 'names.png', 'names')
+
