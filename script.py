@@ -12,7 +12,7 @@ from sqlalchemy import create_engine
 from include.comparison import object_type_to_function_comparison
 
 # ToDo разобраться с последовательностями (sequence), сначала последоватекльность, потом таблица + вынимать последний номер по порядку если есть
-# ToDo реализовать сохранение в файлы.
+# ToDo реализовать создание структуры каталогов для файлов.
 # ToDo реализовать прогресс программы.
 
 def sqlresult(e, sql):
@@ -129,7 +129,18 @@ class db_object():
         if sql_source_function:
             self.source = sqlresult(e, sql.format(sql_source_function, self.oid)).fetchone()[0]
         elif self.object_type == 'table':
-            self.source = subprocess.check_output('PGPASSWORD="postgres" pg_dump -t ksvs.militarycity --schema-only --host=127.0.0.1 --port=5435 --username=postgres --dbname=knd02_damp', shell=True)
+            self.source = subprocess.check_output('PGPASSWORD="postgres" \
+                                                    pg_dump -t ksvs.militarycity \
+                                                    --schema-only \
+                                                    --host=127.0.0.1 \
+                                                    --port=5435 \
+                                                    --username=postgres \
+                                                    --dbname=knd02_damp',
+                                                  shell=True).decode("utf-8")
+
+    def write(self):
+        with open("repo/{0}.sql".format(self.name), "w") as file:
+            file.write("{0}".format(self.source))
 
     def get_parents(self, oid_object):
         return self.parents
@@ -221,10 +232,13 @@ if __name__ == "__main__":
 
     pprint.pprint(objects) # Все объекты
 
-    rank_obj = {value.rank: value.schema_name+'.'+value.name for key, value in objects.items()} # Порядок накатки
-    for order in sorted(rank_obj.keys()):
-        print(order, rank_obj[order])
+    with open("repo/order.txt", "w") as file:
+        rank_obj = {value.rank: value.schema_name+'.'+value.name for key, value in objects.items()} # Порядок накатки
+        for order in sorted(rank_obj.keys()):
+            file.write("{1}.sql\n".format(order, rank_obj[order]))
 
-    get_graphvis(objects, 'oids.png', 'oids')
-    get_graphvis(objects, 'names.png', 'names')
+    for obj_oid, obj in objects.items():
+        obj.write()
+    #get_graphvis(objects, 'oids.png', 'oids')
+    #get_graphvis(objects, 'names.png', 'names')
 
