@@ -7,13 +7,14 @@ import subprocess
 import random
 
 from copy import deepcopy
+from progress.bar import IncrementalBar
 from sqlalchemy import create_engine
 
 from include.comparison import object_type_to_function_comparison
 
 # ToDo разобраться с последовательностями (sequence), сначала последоватекльность, потом таблица + вынимать последний номер по порядку если есть
 # ToDo реализовать создание структуры каталогов для файлов.
-# ToDo реализовать прогресс программы.
+# ToDo Переработать дублирование кода в main
 
 def sqlresult(e, sql):
     """
@@ -84,6 +85,7 @@ def get_graphvis(objects, filename, graph_type):
     
 class db_object():
     """Общий класс для хранения объектов БД"""
+    # ToDo перевести на __slots__
     def __init__(self, oid, schema_name, schema_oid, name, object_type, owner):
         self.oid = oid
         self.schema_name = schema_name
@@ -154,40 +156,61 @@ class db_object():
 if __name__ == "__main__":
     # Создал коннект
     e = create_engine('postgresql://postgres:postgres@127.0.0.1:5435/knd02_damp')
+    # Объявляем словарь объектов
+    objects = {}
 
     # Базовые запросы
     with open('./sql/get_table_all.sql', 'r', encoding='utf-8') as sql:
-        all_tables = sqlresult(e, sql.read())
-    objects = {}
-    for obj in all_tables.fetchall():
+        all_objects = sqlresult(e, sql.read())
+    sql_obj_list = all_objects.fetchall()
+    bar = IncrementalBar('tables'.ljust(12), max=len(sql_obj_list))
+    for obj in sql_obj_list:
         oid, schema_name, schema_oid, name, object_type, owner = obj
         objects[oid] = db_object(oid, schema_name, schema_oid, name, object_type, owner)
+        bar.next()
+    bar.finish()
 
     with open('./sql/get_func_trigger_all.sql', 'r', encoding='utf-8') as sql:
         all_objects = sqlresult(e, sql.read())
-    for obj in all_objects.fetchall():
+    sql_obj_list = all_objects.fetchall()
+    bar = IncrementalBar('functions'.ljust(12), max=len(sql_obj_list))
+    for obj in sql_obj_list:
         oid, schema_name, schema_oid, name, object_type, owner, _, _ = obj
-        objects[oid] = db_object(oid, schema_name, schema_oid, name, object_type, owner)        
+        objects[oid] = db_object(oid, schema_name, schema_oid, name, object_type, owner)
+        bar.next()
+    bar.finish()
 
     with open('./sql/get_all_trigger.sql', 'r', encoding='utf-8') as sql:
         all_objects = sqlresult(e, sql.read())
-    for obj in all_objects.fetchall():
+    sql_obj_list = all_objects.fetchall()
+    bar = IncrementalBar('triggers'.ljust(12), max=len(sql_obj_list))
+    for obj in sql_obj_list:
         oid, schema_name, schema_oid, name, object_type, owner = obj
         objects[oid] = db_object(oid, schema_name, schema_oid, name, object_type, owner)
+        bar.next()
+    bar.finish()
 
     with open('./sql/get_fk_all.sql', 'r', encoding='utf-8') as sql:
-        all_fk = sqlresult(e, sql.read())
-    for fk in all_fk.fetchall():
+        all_objects = sqlresult(e, sql.read())
+    sql_obj_list = all_objects.fetchall()
+    bar = IncrementalBar('fk'.ljust(12), max=len(sql_obj_list))
+    for fk in sql_obj_list:
         fk_from, fk_to, fk_name, fk_sql, _ = fk
         objects[fk_from].parents.append(fk_from)
         objects[fk_to].children.append(fk_from)
         objects[fk_from].fkeys.append(fk)
-    
+        bar.next()
+    bar.finish()
+
     with open('./sql/get_column_all.sql', 'r', encoding='utf-8') as sql:
-        all_columns = sqlresult(e, sql.read())
-    for column in all_columns.fetchall():
+        all_objects = sqlresult(e, sql.read())
+    sql_obj_list = all_objects.fetchall()
+    bar = IncrementalBar('columns'.ljust(12), max=len(sql_obj_list))
+    for column in sql_obj_list:
         oid, num, name, column_type,_ ,nullable,_,_,_,_,_,col_description = column  
         objects[oid].add_column(num, name, column_type, nullable, col_description)
+        bar.next()
+    bar.finish()
 
     # Подготовка имен объектов для поиска через множества (public.all_users -> publicallusers). Вынужденная история для сравнения с sql
     names = {}
@@ -210,7 +233,7 @@ if __name__ == "__main__":
     # Ранжирование по очереди создания
 
     def ranker(all_objects_list, objects, rank, list_ranked):
-        print(len(all_objects_list))
+        #print(len(all_objects_list))
         removed_list = []
         for oid in all_objects_list:
             list_ranked.append(oid)
@@ -228,17 +251,25 @@ if __name__ == "__main__":
         removed_list, rank = ranker(all_objects_list, objects, rank, list_ranked)
         all_objects_list = list(set(all_objects_list) - set(removed_list))
 
-    # Блок принтов ####################################################
+    # Блок записи ####################################################
 
-    pprint.pprint(objects) # Все объекты
+    # pprint.pprint(objects) # Все объекты
+    # Записываем все объекты в человеческом виде
+    with open("repo/objects.txt", "w") as file:
+        for obj in objects.values():
+            file.write(obj.__repr__())
 
+    # Записываем порядок создания объектов
     with open("repo/order.txt", "w") as file:
         rank_obj = {value.rank: value.schema_name+'.'+value.name for key, value in objects.items()} # Порядок накатки
         for order in sorted(rank_obj.keys()):
             file.write("{1}.sql\n".format(order, rank_obj[order]))
 
+    # Записываем sql файлы
     for obj_oid, obj in objects.items():
         obj.write()
+
+    # Создаем графическое представление
     #get_graphvis(objects, 'oids.png', 'oids')
     #get_graphvis(objects, 'names.png', 'names')
 
