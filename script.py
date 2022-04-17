@@ -1,20 +1,52 @@
 # -*- coding: utf-8 -*-
-
+import argparse
+import configparser
 import graphviz
+import os
 import pprint
+import random
+import sys
 import string
 import subprocess
-import random
 
-from copy import deepcopy
 from progress.bar import IncrementalBar
 from sqlalchemy import create_engine
-
 from include.comparison import object_type_to_function_comparison
 
 # ToDo разобраться с последовательностями (sequence), сначала последоватекльность, потом таблица + вынимать последний номер по порядку если есть
 # ToDo реализовать создание структуры каталогов для файлов.
 # ToDo Переработать дублирование кода в main
+
+# ToDo выделить в класс подключения с хранением параметров подключения###################
+# ToDo обработка ошибок в ситуации не все ключи, не та БД, не тот ip, сеттинги битые, добавить -help
+
+def createParser ():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-H', '--host')
+    parser.add_argument('-p', '--port')
+    parser.add_argument('-U', '--username')
+    parser.add_argument('-W', '--password')
+    parser.add_argument('-d', '--dbname')
+    parser.add_argument('-P', '--path')
+    parser.add_argument('-S', '--settings', action='store_true')
+    return parser
+
+def connect_params(namespace):
+    if namespace.settings:
+        config = configparser.ConfigParser()
+        config.read('settings.ini')
+        connparamdict = {name: config.get('conn_settings', name) for name in config.options('conn_settings')}
+        path = config.get('path', 'PATH')
+    else:
+        host =  namespace.host
+        port =  namespace.port
+        user =  namespace.username
+        password = namespace.password
+        db = namespace.dbname
+        path = namespace.path
+        connparamdict = {'host': host, 'port':  port, 'dbname': db, 'username': user, 'password': password}
+    return connparamdict, path
+#ToDo######################################################################################
 
 def sqlresult(e, sql):
     """
@@ -126,18 +158,17 @@ class db_object():
            self.rank)
         
     def _get_source(self):
-        sql = 'select {0}({1})' # ToDo Переделать на f
         sql_source_function = object_type_to_function_comparison(self.object_type)
         if sql_source_function:
-            self.source = sqlresult(e, sql.format(sql_source_function, self.oid)).fetchone()[0]
-        elif self.object_type == 'table':
+            self.source = sqlresult(e, f'select {sql_source_function}({self.oid})').fetchone()[0]
+        elif self.object_type == 'table':  # ToDo Переписать на f  учетом класса подключения.
             self.source = subprocess.check_output('PGPASSWORD="postgres" \
-                                                    pg_dump -t ksvs.militarycity \
+                                                    pg_dump -t {0} \
                                                     --schema-only \
                                                     --host=127.0.0.1 \
                                                     --port=5435 \
                                                     --username=postgres \
-                                                    --dbname=knd02_damp',
+                                                    --dbname=knd02_damp'.format('.'.join([self.schema_name, self.name])),
                                                   shell=True).decode("utf-8")
 
     def write(self):
@@ -155,7 +186,10 @@ class db_object():
             
 if __name__ == "__main__":
     # Создал коннект
-    e = create_engine('postgresql://postgres:postgres@127.0.0.1:5435/knd02_damp')
+    parser = createParser()
+    namespace = parser.parse_args(sys.argv[1:])
+    connparams,  path = connect_params(namespace)
+    e = create_engine(f"postgresql://{connparams['username']}:{connparams['password']}@{connparams['host']}:{connparams['port']}/{connparams['dbname']}") #ToDo требуется рефактор с учетом класса-подключения
     # Объявляем словарь объектов
     objects = {}
 
